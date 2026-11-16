@@ -1,0 +1,205 @@
+@use "sass:list";
+@use "sass:math";
+
+@property --t { syntax: "<length>"; initial-value: 0px; inherits: true; }
+@property --d { syntax: "<number>"; initial-value: 0; inherits: true; }
+@property --hue { syntax: "<number>"; initial-value: 335; inherits: true; }
+@property --sway { syntax: "<length>"; initial-value: 0px; inherits: true; }
+@property --squeeze { syntax: "<number>"; initial-value: 1; inherits: true; }
+@property --vw { syntax: "<length>"; initial-value: 0px; inherits: true; }
+@property --vh { syntax: "<length>"; initial-value: 0px; inherits: true; }
+
+$sceneWidth: 160px;
+$sceneHeight: 100px;
+$horizont: 22px;
+$ground: $sceneHeight - $horizont;
+$drops: 56;
+$near: 0.4;
+$far: 3;
+
+@function rnd($min, $max, $step: null) {
+  $v: $min + ($max - $min) * math.random();
+  @if $step {
+    $v: $min + $step * math.floor(math.div($v - $min, $step));
+  }
+  @return $v;
+}
+
+@function r($item) {
+  $w: list.nth($item, 1);
+  $h: list.nth($item, 2);
+  $x: list.nth($item, 3);
+  $y: list.nth($item, 4);
+  $c: list.nth($item, 5);
+  @return linear-gradient(#{$c} 0 100%) #{$x} #{$y} / #{$w} #{$h} no-repeat;
+}
+
+:root {
+  --vw: 100vw;
+  --vh: 100dvh;
+  --base: oklch(68% 0.24 var(--hue));
+  --neon: oklch(82% 0.13 215);
+  --deep: oklch(13% 0.06 268);
+  --head: color-mix(in oklch, var(--neon) 55%, white);
+  --trail: oklch(from var(--base) 72% 0.29 calc(h - 5));
+  --dim: color-mix(in oklch, var(--base) 28%, oklch(16% 0.02 var(--hue)));
+  --ink: oklch(from var(--base) 14% 0.03 h);
+  --fog: color-mix(in oklch, var(--dim) 75%, var(--ink));
+}
+
+$t1: (-44px, 6, 18px, 22px);
+$t2: (50px, 5, 16px, 26px);
+$t3: (-50px, 7, 22px, 20px);
+$t4: (44px, 6, 14px, 24px);
+$t5: (-46px, 5, 20px, 18px);
+$t6: (48px, 7, 18px, 28px);
+$t7: (-50px, 6, 16px, 22px);
+$t8: (46px, 5, 22px, 16px);
+$t9: (-44px, 7, 14px, 26px);
+$t10: (50px, 6, 20px, 20px);
+
+@function tower($item, $d0) {
+  $x: list.nth($item, 1);
+  $cols: list.nth($item, 2);
+  $base: list.nth($item, 3);
+  $peak: list.nth($item, 4);
+  $d: "(mod(#{$d0} + #{rnd(0, 0.2)} - var(--d), #{$far - $near}) + #{$near})";
+  $s: "(1 / #{$d})";
+  $fog: "calc((#{$d} - #{$near}) / #{$far - $near} * 100%)";
+  $c1: color-mix(in oklch, var(--fog) #{$fog}, color-mix(in oklch, var(--trail) 38%, var(--dim)));
+  $c2: color-mix(in oklch, var(--fog) #{$fog}, color-mix(in oklch, var(--trail) 8%, var(--dim)));
+  $y0: "#{$ground} - (#{$d} - #{$near}) * 2px";
+  $mid: math.div($cols - 1, 2);
+  $walls: ();
+  $lights: ();
+  @for $c from 0 to $cols {
+    $h: $base + math.round($peak * (1 - math.div(math.abs($c - $mid), math.max($mid, 1))));
+    $cx: calc(#{$sceneWidth * 0.5} + #{$x + ($c - $cols * 0.5) * 2px} * #{$s} * var(--squeeze) + var(--sway) * 0.3);
+    $cy: calc(#{$y0} - (#{$h} + #{rnd(0px, 12px, 1px)}) * #{$s});
+    $walls: list.append($walls, linear-gradient(#{$c1}, #{$c2}) #{$cx} #{$cy} / calc(2px * #{$s}) calc(#{$h + 16px} * #{$s}) no-repeat, comma);
+    $lamp: var(--base);
+    @if $c % 2 == 1 { $lamp: var(--neon); }
+    $lx: calc(#{$sceneWidth * 0.5} + #{$x + ($c - $cols * 0.5) * 2px + rnd(0px, 1px, 1px)} * #{$s} * var(--squeeze) + var(--sway) * 0.3);
+    $ly: calc(#{$y0} - #{rnd(2px, $h - 2px, 1px)} * #{$s});
+    $lit: color-mix(in oklch, var(--fog) #{$fog}, color-mix(in oklch, #{$lamp} #{rnd(20%, 90%, 10%)}, transparent));
+    $lights: list.append($lights, r((calc(1px * #{$s}), calc(1px * #{$s}), $lx, $ly, $lit)), comma);
+  }
+  @return ($lights, $walls);
+}
+
+@function city() {
+  $lights: ();
+  $walls: ();
+  $data: ($t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10);
+  @for $i from 1 through list.length($data) {
+    $d0: $near + math.div($far - $near, list.length($data)) * ($i - 1);
+    $t: tower(list.nth($data, $i), $d0);
+    $lights: list.join($lights, list.nth($t, 1), comma);
+    $walls: list.join($walls, list.nth($t, 2), comma);
+  }
+  @return list.join($lights, $walls, comma);
+}
+
+$rain: ();
+@for $i from 1 through $drops {
+  $drop: (rnd(0px, $sceneWidth - 1px, 1px), rnd(1.6, 2.6), rnd(0px, 260px, 1px), rnd(8px, 32px, 8px));
+  $rain: list.append($rain, $drop, comma);
+}
+
+@function drop($i) {
+  $item: list.nth($rain, $i);
+  $x: list.nth($item, 1);
+  $v: list.nth($item, 2);
+  $o: list.nth($item, 3);
+  $len: list.nth($item, 4);
+  $sx: calc(#{$sceneWidth * 0.5} + (#{$x} - #{$sceneWidth * 0.5}) * var(--squeeze));
+  $sy: "round(down, mod(var(--t) * #{$v} + #{$o}, #{$sceneHeight} * #{$v}), 1px)";
+  @return ($sx, $sy, $len);
+}
+
+@function rain() {
+  $result: ();
+  $stops: (var(--head) 0 1px,);
+  @for $k from 1 through 8 {
+    $a: math.div(math.round(95 * math.pow(0.8, $k - 1)), 100);
+    $from: math.percentage(math.div($k - 1, 8));
+    @if $k == 1 { $from: 1px; }
+    $stops: list.append($stops, oklch(from var(--trail) l c h / #{$a}) #{$from} #{math.percentage(math.div($k, 8))}, comma);
+  }
+  @for $i from 1 through $drops {
+    $d: drop($i);
+    $result: list.append($result, linear-gradient(to top, #{$stops}) #{list.nth($d, 1)} calc(#{list.nth($d, 2)} - #{list.nth($d, 3)}) / 1px #{list.nth($d, 3)} no-repeat, comma);
+  }
+  @return $result;
+}
+
+@function sparkle() {
+  $result: ();
+  @for $i from 1 through $drops {
+    $d: drop($i);
+    $result: list.append($result, r((3px, 3px, calc(#{list.nth($d, 1)} - 1px), calc(#{list.nth($d, 2)} - 2px), color-mix(in oklch, var(--neon) 40%, transparent))), comma);
+  }
+  @return $result;
+}
+
+@function road() {
+  $result: ();
+  $p: "round(down, mod(var(--d) * 70px, 6px), 2px)";
+  $asphalt: color-mix(in oklch, var(--dim) 55%, black);
+  @for $i from 0 to 11 {
+    $w: math.round(18px + 4.4px * $i);
+    $x: ($sceneWidth - $w) * 0.5;
+    $y: $ground + 1px + $i * 2px;
+    $edge: oklch(from var(--neon) l c h / calc(1 - mod(#{$y - 1px} - #{$p}, 6px) / 2px));
+    $result: list.join($result, (r((1px, 2px, $x, $y, $edge)), r((1px, 2px, $x + $w - 1px, $y, $edge)), r(($w, 2px, $x, $y, $asphalt))), comma);
+  }
+  $dashes: ();
+  @for $k from -1 through 5 {
+    $on: "calc(#{$p} + #{$k * 6px})";
+    $off: "calc(#{$p} + #{$k * 6px + 2px})";
+    $dashes: list.append($dashes, #{"transparent #{$on}, var(--trail) #{$on} #{$off}, transparent #{$off}"}, comma);
+  }
+  $dash: linear-gradient(to bottom, #{$dashes}) #{$sceneWidth * 0.5 - 0.5px} #{$ground + 1px} / 1px #{$horizont - 1px} no-repeat;
+  $floor: r(($sceneWidth, $horizont - 1px, 0, $ground + 1px, color-mix(in oklch, var(--ink) 75%, black)));
+  @return list.join(($dash,), list.append($result, $floor, comma), comma);
+}
+
+@function crt() {
+  @return (
+    repeating-linear-gradient(oklch(0% 0 0 / 0.15) 0 1px, transparent 1px 2px) 0 0 / 100% 100% no-repeat,
+    radial-gradient(ellipse 85% 80% at 50% 50%, transparent 50%, oklch(0% 0 0 / 0.45)) 0 0 / 100% 100% no-repeat
+  );
+}
+
+@function sky() {
+  @return radial-gradient(ellipse 130% 70% at 50% 100%, var(--fog) 0 32%, color-mix(in oklch, var(--dim) 40%, var(--ink)) 50%, var(--deep)) 0 0 / 100% 100% no-repeat;
+}
+
+.scene {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 0;
+  margin-inline: auto;
+  width: $sceneWidth;
+  height: $sceneHeight;
+  transform-origin: center bottom;
+  scale: max(calc(var(--vw) / #{$sceneWidth}), calc(var(--vh) / #{$sceneHeight}));
+  --squeeze: clamp(0.4, calc(var(--vw) / var(--vh) / 1.6), 1);
+  background: rain(), city(), sky();
+  animation: rain 12s steps(100) infinite, drive 30s steps(600) infinite, hue 60s steps(60) infinite alternate,
+    sway 23s steps(46) infinite alternate;
+  pointer-events: none;
+
+  &:before, &:after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+  &:before { background: sparkle(); mix-blend-mode: screen; }
+  &:after { background: crt(), road(); }
+}
+
+@keyframes rain { to { --t: #{$sceneHeight}; } }
+@keyframes drive { to { --d: #{$far - $near}; } }
+@keyframes hue { from { --hue: 322; } to { --hue: 352; } }
+@keyframes sway { from { --sway: -1px; } to { --sway: 1px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene { animation: none; }
+}
